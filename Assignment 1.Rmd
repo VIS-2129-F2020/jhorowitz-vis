@@ -6,25 +6,294 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warnings = FALSE, messages = FALSE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+suppressMessages(library(tidyverse))
+library(tidycensus)
+library(cowplot)
+library(viridis) 
+library(ggthemes)
+```
+```{r}
+vars <- c("B06009_004",
+          "B25001_001",
+          "B25003_003",
+          "B06007_002",
+          "B01002_001",
+          "B01003_001",
+          "B03002_003",
+          "B03002_004",
+          "B03002_006",
+          "B03002_012",
+          "B01001_026",
+          "B06010_003",
+          "B06010_004",
+          "B06010_005",
+          "B06010_006",
+          "B06010_007",
+          "B06010_008",
+          "B06010_009",
+          "B06010_010",
+          "B06010_011")
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+AT_tracts <- get_acs(geography = "tract", variables = vars,
+                           state = "CA", county = "Los Angeles", output = "wide") %>% 
+             rename(tot_bach = "B06009_004E",
+                    tot_hh = "B25001_001E",
+                    tot_rent_occ = "B25003_003E",
+                    tot_eng = "B06007_002E",
+                    med_age = "B01002_001E",
+                    tot_pop = "B01003_001E",
+                    pop_inc = "B06010_003E",
+                    bel_10 = "B06010_004E", 
+                    bel_15 = "B06010_005E",
+                    bel_25 = "B06010_006E",
+                    bel_35 = "B06010_007E",
+                    bel_50 = "B06010_008E",
+                    bel_65 = "B06010_009E",
+                    bel_75 = "B06010_010E",
+                    abo_75 = "B06010_011E",
+                    nh_white_pop = "B03002_003E",
+                    nh_black_pop = "B03002_004E",
+                    nh_asian_pop = "B03002_006E",
+                    hispanic_pop = "B03002_012E") %>%
+              mutate(pct_rent_occ = tot_rent_occ / tot_hh,
+                     pct_bach = tot_bach / tot_pop,
+                     pct_eng = tot_eng / tot_pop,
+                     majority_inc = case_when(
+                     (bel_10 + bel_15 + bel_25) / pop_inc > 0.5 ~ "bel_25",
+                     (bel_35 + bel_50 + bel_65 + abo_75) / pop_inc > 0.5 ~ "abo_25",
+                     (bel_10 + bel_15 + bel_25 + bel_35 + bel_50 + bel_65 +
+                      bel_75 + abo_75)/pop_inc < 0.5 ~ "other", 
+                     TRUE ~ "None"),
+                     majority_race_eth = case_when(
+                     nh_white_pop / tot_pop > 0.5 ~ "nh_white",
+                     nh_black_pop / tot_pop > 0.5 ~ "nh_black",
+                     nh_asian_pop / tot_pop > 0.5 ~ "nh_asian",
+                    hispanic_pop / tot_pop > 0.5 ~ "hispanic",
+                    (nh_white_pop + nh_black_pop + nh_asian_pop + hispanic_pop) /
+                     tot_pop < 0.5 ~ "other",
+                     TRUE ~ "None")) %>%
+              filter(tot_pop > 0, tot_hh > 0) %>%
+              select(GEOID, pct_rent_occ, pct_bach, pct_eng,
+                     majority_inc, med_age, majority_race_eth, tot_pop)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Plot 1 
+
+```{r}
+AT_tracts %>%
+  ggplot(aes(med_age))+
+  geom_histogram() + 
+  labs(
+    x='Median Age', 
+    y= 'Count',
+    title = 'Histogram of Median Age',
+    subtitle = 'Count of Median Ages in Los Angeles County'
+  )+
+  theme_classic()
+```
+
+# Plot 2 
+
+```{r}
+ggplot(AT_tracts,
+  aes(majority_race_eth, tot_pop,color=majority_race_eth)
+        )+
+  geom_boxplot() + 
+  labs(
+    x='Majority Race/Ethnicity',
+    y='Population',
+    title="Box Plot of Majority Race/Ethnicity",
+    caption = "by @geographerjenny"
+  ) +
+  theme_tufte()
+
+```
+
+
+
+
+# Plot 3 
+
+
+
+
+
+
+```{r}
+ggplot(AT_tracts,
+  aes(majority_race_eth,med_age,color=majority_race_eth)
+        )+
+  geom_violin() + 
+  labs(
+    x='Majority Race/Ethnicity',
+    y='Median Age',
+    title="Violin Plot of Majority Race/Ethnicity",
+    caption = "by Jennifer Lily Horowitz"
+  ) +
+  theme_fivethirtyeight()
+```
+
+
+
+
+# Plot 4 
+
+
+
+
+```{r}
+ggplot(AT_tracts,
+  aes(pct_rent_occ,pct_bach)
+        )+
+  geom_point() + 
+  geom_jitter() + 
+  labs(
+    x='Majority Race/Ethnicity',
+    y='Median Age',
+    title="Violin Plot of Majority Race/Ethnicity",
+    caption = "by JLH"
+  ) +
+  theme_economist()
+
+```
+
+
+
+# Plot 5
+
+
+
+
+```{r}
+medianA<-median(AT_tracts$med_age,na.rm = TRUE)
+AT_tracts %>%
+  ggplot(aes(med_age))+
+  geom_histogram() + 
+  geom_vline(xintercept = medianA,color="#16EB22") +
+ annotate(geom = "text", x=40,y=210,label="Median", size=4, color="#16EB22") +
+  labs(
+    x='Median Age', 
+    y= 'Count',
+    title = 'Histogram of Median Age',
+    subtitle = 'Count of Median Ages in Los Angeles County'
+  )+
+  theme_classic()
+```
+
+
+
+# Plot 6
+
+
+
+```{r}
+ggplot(AT_tracts,
+  aes(majority_race_eth,pct_rent_occ)
+        )+
+  geom_bar(stat="identity")+
+  labs(
+    x= NULL,
+    y='Median Age',
+    title="Bar Chart Showing Rent Occupation by Race/Ethnicity",
+    caption = "by Jenny from the block"
+  ) +
+  coord_flip () +
+  scale_y_continuous(breaks = seq(0,625,50),labels=seq(0,625,50)) +
+  theme_economist_white()
+```
+
+
+
+# Plot 7
+
+
+
+
+```{r}
+ggplot(AT_tracts,
+  aes(pct_bach, tot_pop) 
+        )+
+  geom_point() + 
+  geom_jitter() + 
+  geom_smooth(method = "lm") +
+  scale_x_log10(   breaks = scales::trans_breaks("log10", function(x) 10^x),   labels = scales::trans_format("log10", scales::math_format(10^.x)) ) + scale_y_log10(   breaks = scales::trans_breaks("log10", function(x) 10^x),   labels = scales::trans_format("log10", scales::math_format(10^.x)) ) +
+  labs(
+    x="Percent Holding a Bachelor's Degree",
+    y='Total Population',
+    title="Scatter Plot of Percent Bachelor and Total Population",
+    caption = "by JH"
+  ) +
+  theme_solarized()
+```
+
+
+
+
+# Plot 8 
+
+
+
+
+```{r}
+ggplot(AT_tracts,
+  aes(majority_race_eth,pct_rent_occ)
+        )+
+  geom_bar(stat="identity")+   
+  coord_polar("x", start = 0) +
+  labs(
+    x= NULL,
+    y='Median Age',
+    title="Pie Chart of Rent Occupation\n and Race/Ethnicity",
+    caption = "by Jenny from the block"
+  ) +
+  theme_economist_white()
+
+```
+   
+   
+   
+# Plot 9 
+   
+   
+   
+```{r}
+AT_tracts %>%
+  ggplot(aes(med_age))+
+  geom_density(fill = "#FED13B") + 
+  labs(
+    x='Median Age', 
+    y= 'Count',
+    title = 'Density Plot of Median Age',
+    subtitle = 'Denisty Breakdown Based Upon County Median Age'
+  )+
+  theme_classic()
+```
+
+
+
+# Plot 10
+
+
+
+
+```{r}
+ggplot(AT_tracts,
+  aes(majority_race_eth,med_age)
+        )+
+  geom_bar(stat="identity")+
+  labs(
+    x= NULL,
+    y='Median Age',
+    title="Bar Chart of Median Age\n by Race/Ethnicity",
+    caption = "by Carole Baskin"
+  ) +
+  # scale_x_continuous(breaks = seq(0,625,50),labels=seq(0,625,50)) +
+  theme_wsj() 
+```
+
