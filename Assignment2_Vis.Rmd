@@ -1,0 +1,166 @@
+---
+title: "Assignment 2"
+author: "Jennifer Horowitz"
+date: "9/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message = F,warnings = F)
+```
+
+## Setup 
+
+```{r load libraries, message=FALSE}
+library(sf)
+library(rnaturalearth)
+library(tidyverse)
+library(ggspatial)
+library(cartogram)
+library(ggthemes)
+library(rgeos)
+library(rnaturalearthhires)
+library(viridis)
+```
+
+#### States in US
+
+```{r}
+us_states <- ne_states(country = "united states of america", returnclass = "sf")
+
+us_map <- ggplot(us_states) +
+  geom_sf() +
+  theme_bw()
+
+us_map
+```
+
+
+
+
+### Transverse Mercator Projection 
+
+
+
+```{r}
+USA_states <- ne_states(country = "United States of America", 
+                       returnclass = "sf") 
+USA_TVM <- "+proj=tmerc + lat_0=26 +lon_0=-129 +k_0=1 +x_0=0 +y_0=0 +ellps=bessel + no_defs"
+ggplot(USA_states) +
+  theme_classic() + 
+  geom_sf() +
+  coord_sf(crs = USA_TVM) 
+```
+
+
+### Azimuthal Equidistant Projection 
+
+
+
+```{r}
+
+USA_AEQD <- "+proj=aeqd +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+ggplot(us_states) +
+  theme_economist() + 
+  geom_sf() +
+  coord_sf(crs = USA_AEQD)
+```
+
+
+
+
+### Universal Transverse Mercador Projection
+
+
+
+```{r}
+USA_UTM <- "+proj=aeqd +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+ggplot(us_states) +
+  theme_economist() + 
+  geom_sf() +
+  coord_sf(crs = USA_UTM)
+```
+
+
+
+
+### Mapping Data 
+
+
+
+```{r}
+USArrests <- read_csv("USArrests.csv") 
+
+
+USArrests <- USArrests %>% 
+  rename(name=X1) 
+```
+
+
+
+## Choropleth Map
+
+
+
+```{r}
+Arrestsbystate <- us_states %>%
+  left_join(USArrests)
+```
+```{r}
+ggplot(Arrestsbystate, aes(fill = Murder)) +
+  geom_sf(color = NA) +
+  scale_fill_viridis_c(
+    name = "Murder by State",
+    breaks = seq(0,18,by= 2),
+    labels = formatC(seq(0,18, by = 2), 
+                     big.mark = ",", format = "f", digits = 0) 
+             ) +
+  theme_map() +
+  theme(legend.background = element_blank())
+```
+
+
+
+## Murder Incidents by State in Urban Population: Azimuthal Equidistant Projection
+
+
+
+```{r}
+Arrestsbystate %>%
+ st_transform(crs = USA_AEQD) %>% cartogram_ncont("UrbanPop") %>% 
+  #st_centroid() %>% 
+
+ggplot(aes(fill = Murder)) +
+  geom_sf(color = NA) +
+  theme_map() +
+  theme(legend.background = element_blank())
+```
+
+
+
+
+## Murder Incidents by State in Urban Population: Universal Transverse Mercador Projection
+
+
+
+
+```{r}
+us_centroids <- us_states %>%
+  left_join (USArrests) %>%
+  st_centroid () 
+ 
+ 
+Arrestsbystate %>%
+ st_transform(crs = USA_UTM) %>% cartogram_ncont("UrbanPop") %>%
+ ggplot() +
+ geom_sf(fill = NA, color = "gray") +
+ geom_sf(data = us_centroids,aes(size = Murder),          
+ alpha = 0.5, color = "red") +
+ scale_size_continuous(name = "1973 Murder Rate",    
+ breaks = seq(0,18, by = 2),    
+ labels = formatC(seq(0,18, by = 2),                      
+ big.mark = ",", format = "f", digits = 0),    
+ range = c(0, .3)) +
+ theme_void()
+```
+
