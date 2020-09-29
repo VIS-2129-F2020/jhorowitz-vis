@@ -1,0 +1,272 @@
+---
+title: "Assignment 3"
+author: "Jennifer Horowitz"
+date: "9/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(sf)
+library(tidyverse)
+library(ggthemes)
+library(ggspatial)
+library(units)
+library(nngeo)
+```
+
+```{r}
+waterworks <-st_read ("https://opendata.arcgis.com/datasets/bb07e955e22548868987f4ac41126336_21.kml", quiet = T)
+
+firestations <- st_read ("https://opendata.arcgis.com/datasets/ade6dae35a034170ae85606b865aa5ed_0.kml", quiet = T)
+
+internet <- st_read ("https://opendata.arcgis.com/datasets/ed87c3ffef5744a79d0a6321556bfb00_27.kml", quiet = T)
+
+obesity <- st_read ("https://opendata.arcgis.com/datasets/6562bb5f227a4d38ace8841c96846735_0.kml", quiet = T) 
+```
+
+```{r}
+ggplot(firestations) +
+  geom_sf(fill= "orange", color = "yellow") +
+  geom_sf(data = obesity, color = "red", size = 0.01) +
+  geom_sf (data = internet, size = 0.01) +
+  geom_sf (data = waterworks, fill = NA, color = "blue")
+```
+
+```{r}
+CA_state_plane <- "+proj=lcc +lat_1=32.78333333333333 +lat_2=33.88333333333333 +lat_0=32.16666666666666 +lon_0=-116.25 +x_0=2000000 +y_0=500000.0000000002 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 no_defs"
+
+waterworks <- waterworks %>%
+  st_transform(CA_state_plane)
+
+firestations <- firestations %>%
+  st_transform(CA_state_plane)
+
+internet <- internet %>%
+  st_transform(CA_state_plane)
+
+obesity <- obesity %>%
+  st_transform(CA_state_plane)
+```
+
+```{r}
+internet_buffer <- st_buffer(internet, dist = 30) %>%
+  st_union()
+
+obesity_internet <- obesity[internet_buffer,]
+```
+
+```{r}
+obesity <- obesity %>%
+  st_join(obesity_internet) %>%
+  mutate(by_internet = !is.na(Name.y))
+```
+
+```{r}
+n_internet_obesity <- sum(obesity$by_internet)
+n_internet_obesity
+```
+
+```{r}
+n_obesity <- length(obesity$by_internet)
+pct_internet_obesity <- n_internet_obesity / n_obesity
+pct_internet_obesity
+```
+
+How many obese people are within 30 km of internet? 17 is the number of obese people within 30 km of an internet station. 
+
+```{r}
+left_side  <- st_bbox(obesity)$xmin
+top_side <- st_bbox(obesity)$ymax
+ggplot(firestations) +
+  geom_sf(fill = "lightblue", color = NA) +
+  geom_sf(data = obesity, size = 0.01,
+          aes(color = by_internet)) +
+  scale_color_manual(values = c("lightgreen", "darkgreen"),
+          name = "Obesity distance to internet", 
+          labels = c("No internet within 30 km",
+                     "Internet within 30 km")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side, 
+           y = top_side, 
+           label = paste("Of the ", 
+                         prettyNum(n_obesity, big.mark = ","),
+                         " obesity\n", 
+                         prettyNum(n_internet_obesity, big.mark = ","),
+                         " (", 
+                         prettyNum(100*pct_internet_obesity, digits = 0),
+                         "%) are within 30\nkm of a an intenet station.",
+                         sep = ""),
+           hjust = 0, vjust = 0, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+How many internet stations are there in the range of 30 km of obese people? There are 35 internet stations within range of obese people. The proportion of internet stations to obese people is 100%.  
+
+```{r}
+obesity_buffer <- st_buffer(obesity, dist = 30) %>%
+  st_union()
+
+internet_obesity <- internet[obesity_buffer,]
+```
+```{r}
+internet <- internet %>%
+  st_join(internet_obesity) %>%
+  mutate(by_obesity = !is.na(Name.y))
+```
+
+```{r}
+n_obesity_internet <- sum(internet$by_obesity)
+n_obesity_internet
+```
+
+```{r}
+n_internet <- length(internet$by_obesity)
+pct_obesity_internet <- n_obesity_internet / n_internet
+pct_obesity_internet
+```
+
+```{r, message=FALSE, results='hide'}
+internet <- internet %>%
+  mutate(obesity_dist = st_nn(internet, obesity, 
+                           returnDist = TRUE)$dist) %>%
+  mutate(obesity_dist = as.numeric(obesity_dist))
+```
+There is on average 0 distance between internet stations and obese people.
+
+```{r}
+sum(internet$obesity_dist,na.rm =T)
+```
+
+```{r, message=FALSE, results='hide'}
+obesity <- obesity %>%
+  mutate(internet_dist = st_nn(obesity, internet, 
+                           returnDist = TRUE)$dist) %>%
+  mutate(internet_dist = as.numeric(internet_dist))
+```
+There is on average 0 distance between internet stations and obese people.
+
+```{r}
+mean(internet$obesity_dist,na.rm =T)
+```
+```{r}
+waterworks <- waterworks %>%
+  mutate(num_obesity = lengths(st_covers(waterworks, obesity)))
+ggplot(waterworks) +
+  geom_sf(color = NA, 
+          aes(fill = num_obesity)) +
+  #scale_fill_viridis_c(name = "Waterwork boundaries \nby obese people",
+                       #breaks = breaks <- seq(0, 30000, by = 5000),
+                       #labels = paste(prettyNum(breaks, big.mark = ","),
+                                      #"obesity")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("pink", 0.5), 
+                                         color = "green"))
+```
+```{r}
+sum(waterworks$num_obesity)
+```
+
+The number of obese people by waterworks boundaries is 0. 
+
+```{r}
+
+n_waterworks <- length(obesity$by_internet)
+sum(waterworks$num_obesity) / n_obesity
+```
+
+The proportion of obese people to waterworks boundaries is 
+
+```{r}
+firestations <- firestations %>%
+  mutate(num_obesity = lengths(st_covers(firestations, obesity)))
+ggplot(firestations) +
+  geom_sf(color = NA, 
+          aes(fill = num_obesity)) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("purple", 0.5), 
+                                         color = "yellow"))
+```
+```{r}
+sum(firestations$num_obesity)
+```
+
+The number of obese people by waterworks boundaries is 0. 
+
+```{r}
+
+n_firestations <- length(obesity$by_internet)
+sum(firestations$num_obesity) / n_firestations
+```
+
+The proportion of the obese people by waterworks boundaries is also 0. 
+
+```{r}
+waterworks <- waterworks %>%
+  mutate(num_internet = lengths(st_covers(waterworks, internet)))
+ggplot(waterworks) +
+  geom_sf(color = NA, 
+          aes(fill = num_internet)) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("blue", 0.5), 
+                                         color = "yellow"))
+```
+
+
+The number of waterworks boundaries to internet stations is 1. 
+
+
+
+```{r}
+sum(waterworks$num_internet)
+```
+
+```{r}
+n_waterworks <- length(internet$by_obesity)
+sum(waterworks$num_internet) / n_waterworks
+```
+
+The proportion of waterworks boundaries to internet stations is 0.02857143.
+
+
+```{r}
+firestations <- firestations %>%
+  mutate(num_internet = lengths(st_covers(firestations, internet)))
+ggplot(firestations) +
+  geom_sf(color = NA, 
+          aes(fill = num_internet)) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("red", 0.5), 
+                                         color = "yellow"))
+```
+
+
+The number of firestations to internet stations is 1.
+
+```{r}
+sum(firestations$num_internet)
+```
+
+
+```{r}
+n_firestations <- length(internet$by_obesity)
+sum(firestations$num_internet) / n_firestations
+```
+
+The proportion of firestations to internet stations is 0.02857143. 
