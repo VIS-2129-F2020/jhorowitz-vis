@@ -48,13 +48,21 @@ MA_state_plane <- "+proj=lcc +lat_1=41.71666666666667 +lat_2=42.68333333333333 +
 
 
 ```{r}
-latestingsites_features <- opq(bbox = 'Los Angeles CA USA',timeout= 100) %>%
-  add_osm_feature(key = 'highway') %>%
-  osmdata_sf()
+#latestingsites_features <- opq(bbox = 'Los Angeles CA USA',timeout= 100) %>%
+  #add_osm_feature(key = 'highway') %>%
+  #osmdata_sf()
 ```
 ```{r}
-testingsites <- latestingsites_features$osm_lines %>%
-  st_transform(crs = CA_state_plane)
+#testingsites <- latestingsites_features$osm_lines %>%
+  #st_transform(crs = CA_state_plane)
+```
+
+
+```{r}
+#opq(bbox = 'Cambridge MA USA') %>%
+  #add_osm_feature(key = 'highway') %>%
+  #osmdata_xml(file = 'OTP/graphs/default/cambridge_streets.osm')
+```
 ```
 
 
@@ -70,7 +78,8 @@ cambridge_streets <- cambridge_street_features$osm_lines %>%
 ```
 
 ```{r, message=FALSE, results='hide'}
-path_data <- file.path(getwd(), "OTP")
+path_data <- read.csv("   ")
+#path_data <- file.path(getwd(), "OTP")
 path_otp <- paste(path_data, "otp.jar",sep = "/")
 otp_build_graph(otp = path_otp, dir = path_data, memory = 1024) 
 ```
