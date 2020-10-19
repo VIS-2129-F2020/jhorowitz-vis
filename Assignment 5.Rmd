@@ -31,18 +31,18 @@ clarkcountyplane <- '+proj=tmerc +lat_0=36.1 +lon_0=-115 +k=1 +x_0=85000 +y_0=12
 
 citylimits <- citylimits %>% st_transform(clarkcountyplane)
 
-trafficincidents <- st_as_sf(x = trafficincidents,                         
-           coords = the_geom,
-           crs = 4326)
-```
+#trafficincidents <- st_as_sf(x = trafficincidents,                         
+           #coords = the_geom,
+           #crs = 4326)
 
 
-```{r}
-aggregatedtrafficincidents <- trafficincidents %>% 
-  group_by(the_geom) %>% 
-  summarize(n=n()) %>% 
-  st_as_sf()
+
+hydrants <- st_read ('https://opendata.arcgis.com/datasets/982dae940659422da1e46b2dedafc4ca_0.kml?outSR=102707')
+
+manholes <- st_read ('https://opendata.arcgis.com/datasets/ac0e7842625841719636db50df111e7c_0.kml?outSR=%7B%22latestWkid%22%3A3421%2C%22wkid%22%3A102707%7D')
+
 ```
+
 
 
 ```{r}
@@ -55,10 +55,10 @@ ggplot() +
   ggRGB(vegas_strip, 
         r = 1, g = 2, b = 3, ggLayer = TRUE) +
   geom_sf(alpha = 0.2) +
-  geom_sf(data = aggregatedtrafficincidents, size = 0.01,
-          aes(color = n)) +
-  coord_sf(xlim = c(vegas_strip@extent@xmin, vegas_strip@extent@xmax),
-           ylim = c(vegas_strip@extent@ymin, vegas_strip@extent@ymax)) +
+  geom_sf(data = manholes, size = 1.5, aes(fill=Name)
+          ) +
+  coord_sf(xlim = c(vegas_strip@extent@xmin, 1000),
+           ylim = c(vegas_strip@extent@ymin, 750)) +
   theme_map() +
   annotation_scale() +
   annotation_north_arrow(location = "tr") +
