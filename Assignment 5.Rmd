@@ -1,0 +1,68 @@
+---
+title: "Assignment 5"
+author: "Jennifer Horowitz"
+date: "10/13/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(raster)
+library(tidyverse)
+library(RStoolbox)
+library(ggthemes)
+library(ggspatial)
+library(osmdata)
+library(sf)
+```
+
+## Load data 
+
+First, I'll look at Las Vegas [pedestrian traffic incidents](https://opendataportal-lasvegas.opendata.arcgis.com/datasets/pedestrian-safety-fy2018. ) taken from the Las Vegas open data portal for the Las Vegas [city limits] (https://geocommons-lasvegas.opendata.arcgis.com/datasets/city-of-las-vegas-limits).
+
+```{r}
+trafficincidents <- read.csv ("Pedestrian_Safety_FY2018.csv")
+citylimits <- st_read ('https://opendata.arcgis.com/datasets/aceb8664e3534d4ab7150c33428d1b6b_17.kml?outSR=%7B%22latestWkid%22%3A3421%2C%22wkid%22%3A102707%7D')
+
+clarkcountyplane <- '+proj=tmerc +lat_0=36.1 +lon_0=-115 +k=1 +x_0=85000 +y_0=125000 +ellps=GRS80 +units=m +no_defs'
+
+citylimits <- citylimits %>% st_transform(clarkcountyplane)
+
+trafficincidents <- st_as_sf(x = trafficincidents,                         
+           coords = the_geom,
+           crs = 4326)
+```
+
+
+```{r}
+aggregatedtrafficincidents <- trafficincidents %>% 
+  group_by(the_geom) %>% 
+  summarize(n=n()) %>% 
+  st_as_sf()
+```
+
+
+```{r}
+vegas_strip <- stack("LVstripgeoreferencemap.tif")
+
+ggRGB(vegas_strip, r = 1, g = 2, b = 3)
+```
+```{r}
+ggplot() +
+  ggRGB(vegas_strip, 
+        r = 1, g = 2, b = 3, ggLayer = TRUE) +
+  geom_sf(alpha = 0.2) +
+  geom_sf(data = aggregatedtrafficincidents, size = 0.01,
+          aes(color = n)) +
+  coord_sf(xlim = c(vegas_strip@extent@xmin, vegas_strip@extent@xmax),
+           ylim = c(vegas_strip@extent@ymin, vegas_strip@extent@ymax)) +
+  theme_map() +
+  annotation_scale() +
+  annotation_north_arrow(location = "tr") +
+  labs(caption = "Georeferenced Las Vegas Strip by Jennifer Horowitz")
+```
+
+
