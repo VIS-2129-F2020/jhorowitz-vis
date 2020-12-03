@@ -1,0 +1,77 @@
+---
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning= FALSE, message = FALSE) 
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(htmltools)
+library(htmlwidgets)
+library(raster)
+library(gstat)
+library(spatial)
+```
+
+```{r}
+apartmentrentals <- st_read(
+  "https://data.cambridgema.gov/api/geospatial/iect-ma2e?method=export&format=KML")
+```
+
+## Plotting Cambridge neighborhoods in Leaflet
+
+```{r} 
+cambridge_nhoods <- st_read("https://data.cambridgema.gov/api/geospatial/4ys2-ebga?method=export&format=GeoJSON", quiet = TRUE) %>%
+  dplyr::select(name)
+
+leaflet(cambridge_nhoods) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addPolygons(highlightOptions = highlightOptions(fillColor = "orange", 
+                                                  fillOpacity = 1),
+              label = ~name, 
+              weight = 1) 
+```
+## Calculating how many apartment rentals per neighborhood 
+
+```{r}
+cambridge_nhoods %>% 
+  st_join(apartmentrentals) %>% 
+  group_by(name) %>% 
+  summarize(count=n()) %>% 
+  ungroup()
+```
+### Apartment rentals per Cambridge neighborhood 
+
+## Map 1: Chloropleth
+
+```{r}
+cambridge_nhoods <- cambridge_nhoods %>%
+  mutate(homesforrent = c(58, 88, 41, 120, 213, 102, 74, 
+                       128, 162, 7, 139, 129, 148))
+
+cambridge_nhoods$label <- 
+  paste(cambridge_nhoods$name, "<br>", 
+        cambridge_nhoods$homesforrent, "homes for rent") %>% 
+  lapply(htmltools::HTML)
+
+bins <- seq(min(cambridge_nhoods$homesforrent),
+            max(cambridge_nhoods$homesforrent), by = 1)
+pal <- colorNumeric("viridis", 
+                    domain = cambridge_nhoods$homesforrent,
+                    na.color = "#00000000")
+
+leaflet(cambridge_nhoods) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addPolygons(highlightOptions = highlightOptions(fillOpacity = 1),
+              label = ~label,
+              fillColor = ~pal(homesforrent),
+              weight = 1, color = "black") %>% 
+  addLegend(pal = pal, 
+            values = ~homesforrent,
+            bins = 3,
+            opacity = 0.7, title = "Homes for rent",
+            position = "topright")
+```

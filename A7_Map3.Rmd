@@ -1,0 +1,98 @@
+---
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning= FALSE, message = FALSE) 
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(htmltools)
+library(htmlwidgets)
+library(raster)
+library(gstat)
+library(spatial)
+```
+
+```{r}
+apartmentrentals <- st_read(
+  "https://data.cambridgema.gov/api/geospatial/iect-ma2e?method=export&format=KML")
+```
+
+## Plotting Cambridge neighborhoods in Leaflet
+
+```{r}
+cambridge_nhoods <- st_read("https://data.cambridgema.gov/api/geospatial/4ys2-ebga?method=export&format=GeoJSON", quiet = TRUE) %>%
+  dplyr::select(name)
+```
+## Calculating how many apartment rentals per neighborhood 
+
+```{r}
+cambridge_nhoods %>% 
+  st_join(apartmentrentals) %>% 
+  group_by(name) %>% 
+  summarize(count=n()) %>% 
+  ungroup()
+```
+
+
+```{r}
+cambridge_nhoods <- cambridge_nhoods %>%
+  mutate(homesforrent = c(58, 88, 41, 120, 213, 102, 74, 
+                       128, 162, 7, 139, 129, 148))
+
+cambridge_nhoods$label <- 
+  paste(cambridge_nhoods$name, "<br>", 
+        cambridge_nhoods$homesforrent, "homes for rent") %>% 
+  lapply(htmltools::HTML)
+
+bins <- seq(min(cambridge_nhoods$homesforrent),
+            max(cambridge_nhoods$homesforrent), by = 1)
+pal <- colorNumeric("viridis", 
+                    domain = cambridge_nhoods$homesforrent,
+                    na.color = "#00000000")
+```
+```{r}
+MA_state_plane <- "+proj=lcc +lat_1=41.71666666666667 +lat_2=42.68333333333333 +lat_0=41 +lon_0=-71.5 +x_0=200000 +y_0=750000 +ellps=GRS80 +units=m +no_defs "
+
+WGS84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+
+nhood_points <- st_centroid(
+  st_transform(cambridge_nhoods, crs = MA_state_plane)) %>%
+  st_transform(WGS84)
+```
+
+## Map 3: Continous Surface
+
+```{r}
+nhood_pts_sp <- nhood_points %>%
+  st_transform(MA_state_plane) %>%
+  as_Spatial()
+
+nhood_poly_sp <- cambridge_nhoods %>%
+  st_transform(MA_state_plane) %>%
+  as_Spatial()
+```
+```{r}
+cambridge_raster <- raster(nhood_poly_sp, res=10)
+```
+
+```{r}
+gs <- gstat(formula=homesforrent~1, locations=nhood_pts_sp)
+idw_interp <- interpolate(cambridge_raster, gs)
+
+idw_interp_clip <- mask(idw_interp, nhood_poly_sp)
+```
+
+```{r}
+leaflet(nhood_points) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addRasterImage(idw_interp_clip, colors = pal, opacity = 0.8) %>% 
+  addLegend(pal = pal, 
+            values = ~homesforrent,
+            bins = 3,
+            opacity = 0.7, title = "Homes for rent",
+            position = "topright")
+```
